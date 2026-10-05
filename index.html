@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ColisSûr — Maquette interactive</title>
+<title>ColisSûr</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0E3D39">
 <meta name="mobile-web-app-capable" content="yes">
@@ -19,8 +19,10 @@
     --bg:#EEF1EB;
     --card:#FFFFFF;
     --primary:#0E3D39;
+    --primary-dark:#092A27;
     --primary-light:#E3ECE9;
-    --accent:#D97706;
+    --accent:#C17D1F;
+    --accent-deep:#A5680F;
     --accent-light:#FBEEDB;
     --success:#2F7D4F;
     --success-light:#E5F2EA;
@@ -30,30 +32,43 @@
     --muted:#5F6E67;
     --border:#DBE0D8;
     --radius:14px;
+    --ease:cubic-bezier(.22,1,.36,1);
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-bottom:env(safe-area-inset-bottom,0px);
   }
   *{box-sizing:border-box;}
-  body{
+  html,body{
+    height:100%;
     margin:0;
+    overscroll-behavior-y:none;
+  }
+  body{
     background:var(--bg);
     font-family:'Inter',sans-serif;
     color:var(--text);
-    display:flex;
-    justify-content:center;
-    padding:28px 12px;
+    -webkit-font-smoothing:antialiased;
   }
   .phone{
-    width:380px;
-    max-width:100%;
+    width:100%;
+    min-height:100%;
     background:var(--card);
-    border-radius:28px;
-    border:1px solid var(--border);
-    box-shadow:0 20px 40px -20px rgba(14,61,57,0.25);
-    overflow:hidden;
+    display:flex;
+    flex-direction:column;
   }
   .topbar{
     background:var(--primary);
+    background-image:linear-gradient(165deg, var(--primary) 0%, var(--primary-dark) 100%);
     color:#fff;
-    padding:16px 18px 14px;
+    padding:calc(14px + var(--safe-top)) 18px 14px;
+    position:sticky;
+    top:0;
+    z-index:40;
+    transition:padding .35s var(--ease), box-shadow .35s var(--ease);
+  }
+  .topbar.compact{
+    padding-top:calc(8px + var(--safe-top));
+    padding-bottom:9px;
+    box-shadow:0 12px 24px -16px rgba(0,0,0,0.45);
   }
   .brand{
     display:flex;
@@ -88,6 +103,71 @@
     background:#fff;
     color:var(--primary);
   }
+  .topbar-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:12px;
+  }
+  .topbar-row .brand{margin-bottom:0;}
+  #btn-menu{
+    width:34px;height:34px;
+    border:none;
+    border-radius:50%;
+    background:rgba(255,255,255,0.12);
+    color:#fff;
+    font-size:18px;
+    line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    transition:background .2s var(--ease), transform .15s var(--ease);
+  }
+  #btn-menu:active{transform:scale(0.9);}
+  #menu-overlay{
+    position:fixed;inset:0;
+    background:rgba(10,20,18,0.35);
+    z-index:60;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s var(--ease);
+  }
+  #menu-overlay.open{opacity:1;pointer-events:auto;}
+  #menu-sheet{
+    position:fixed;
+    right:10px;
+    top:calc(10px + var(--safe-top));
+    background:#fff;
+    border-radius:16px;
+    box-shadow:0 20px 48px -12px rgba(9,42,39,0.4);
+    overflow:hidden;
+    z-index:61;
+    min-width:208px;
+    transform:translateY(-8px) scale(0.96);
+    opacity:0;
+    pointer-events:none;
+    transition:transform .22s var(--ease), opacity .2s var(--ease);
+  }
+  #menu-sheet.open{
+    transform:translateY(0) scale(1);
+    opacity:1;
+    pointer-events:auto;
+  }
+  #menu-sheet button{
+    display:flex;align-items:center;gap:10px;
+    width:100%;
+    padding:13px 16px;
+    border:none;border-bottom:1px solid var(--border);
+    background:#fff;
+    font-family:'Inter',sans-serif;
+    font-weight:500;
+    font-size:14px;
+    color:var(--text);
+    text-align:left;
+    cursor:pointer;
+  }
+  #menu-sheet button:last-child{border-bottom:none;}
+  #menu-sheet button:active{background:var(--primary-light);}
+  #menu-sheet .menu-icon{font-size:16px;width:18px;text-align:center;}
   .vault{
     display:flex;
     align-items:center;
@@ -384,6 +464,77 @@
     0%{ transform:scale(0.6); opacity:0; }
     100%{ transform:scale(1); opacity:1; }
   }
+
+  /* ---- Bottom sheet modal (Profil / Paramètres / Aide) ---- */
+  #modal-overlay{
+    position:fixed;inset:0;
+    background:rgba(10,20,18,0.45);
+    z-index:70;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s var(--ease);
+  }
+  #modal-overlay.open{opacity:1;pointer-events:auto;}
+  #modal-sheet{
+    position:fixed;
+    left:0;right:0;bottom:0;
+    background:#fff;
+    border-radius:22px 22px 0 0;
+    z-index:71;
+    max-height:82vh;
+    overflow-y:auto;
+    padding:8px 20px calc(24px + var(--safe-bottom));
+    transform:translateY(100%);
+    transition:transform .32s var(--ease);
+    box-shadow:0 -20px 50px -20px rgba(9,42,39,0.4);
+  }
+  #modal-sheet.open{transform:translateY(0);}
+  #modal-sheet .modal-handle{
+    width:36px;height:4px;border-radius:2px;
+    background:var(--border);
+    margin:10px auto 14px;
+  }
+  #modal-sheet h3{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:17px;font-weight:600;margin:0 0 4px;
+  }
+  #modal-sheet .modal-body{font-size:13.5px;line-height:1.6;color:var(--text);}
+  #modal-sheet .modal-body p{margin:8px 0;}
+  #modal-sheet .modal-close{
+    position:absolute;top:14px;right:16px;
+    width:30px;height:30px;border-radius:50%;
+    border:none;background:var(--primary-light);color:var(--primary);
+    font-size:15px;cursor:pointer;
+  }
+
+  /* ---- Transition entre écrans ---- */
+  .screen{animation:screenIn .32s var(--ease);}
+  @keyframes screenIn{
+    0%{ opacity:0; transform:translateY(10px); }
+    100%{ opacity:1; transform:translateY(0); }
+  }
+
+  /* ---- Pression des boutons (retour tactile) ---- */
+  button{transition:transform .15s var(--ease), box-shadow .15s var(--ease), background .2s var(--ease);}
+  button.primary{
+    box-shadow:0 10px 22px -10px rgba(161,104,15,0.55);
+    background-image:linear-gradient(165deg, var(--accent) 0%, var(--accent-deep) 100%);
+  }
+  button.primary:active{transform:scale(0.97) translateY(1px);box-shadow:0 4px 10px -6px rgba(161,104,15,0.5);}
+  button.secondary:active{transform:scale(0.97);background:var(--primary-light);}
+  .type-btn:active, .op-btn:active{transform:scale(0.96);}
+  .type-btn, .op-btn, .card{transition:transform .15s var(--ease), border-color .2s var(--ease), background .2s var(--ease);}
+
+  /* ---- Chiffres qui comptent ---- */
+  .count-up{display:inline-block;}
+
+  /* ---- Tampon de confirmation (statut terminé) ---- */
+  .stamp-pop{animation:stampPop .5s var(--ease);}
+  @keyframes stampPop{
+    0%{ transform:scale(0.5) rotate(-8deg); opacity:0; }
+    60%{ transform:scale(1.08) rotate(2deg); opacity:1; }
+    100%{ transform:scale(1) rotate(0deg); opacity:1; }
+  }
 </style>
 </head>
 <body>
@@ -395,12 +546,30 @@
 </div>
 
 <div class="phone">
-  <div class="topbar">
-    <div class="brand"><span class="lock">&#128274;</span>ColisSûr</div>
+  <div class="topbar" id="topbar">
+    <div class="topbar-row">
+      <div class="brand"><span class="lock">&#128274;</span>ColisSûr</div>
+      <button id="btn-menu" aria-label="Menu">&#8942;</button>
+    </div>
     <div class="roles">
       <button id="btn-role-vendeur" class="active">Vendeuse</button>
       <button id="btn-role-client">Client &amp; agent</button>
     </div>
+  </div>
+
+  <div id="menu-overlay"></div>
+  <div id="menu-sheet">
+    <button id="menu-profil"><span class="menu-icon">&#128100;</span>Profil / mon compte</button>
+    <button id="menu-parametres"><span class="menu-icon">&#9881;&#65039;</span>Paramètres</button>
+    <button id="menu-aide"><span class="menu-icon">&#128172;</span>Aide et contact</button>
+  </div>
+
+  <div id="modal-overlay"></div>
+  <div id="modal-sheet">
+    <button class="modal-close" id="modal-close">&#10005;</button>
+    <div class="modal-handle"></div>
+    <h3 id="modal-title"></h3>
+    <div class="modal-body" id="modal-body"></div>
   </div>
 
   <div class="vault">
@@ -563,6 +732,9 @@ function shareOnWhatsApp(o){
     'Clique ici pour payer en sécurité : ' + lien;
   var url = 'https://wa.me/?text=' + encodeURIComponent(texte);
   openExternalLink(url);
+  if(o.photoProduit){
+    window.alert('N\'oublie pas d\'envoyer aussi la photo du produit en pièce jointe, juste après ce message WhatsApp — elle ne part pas automatiquement avec le lien.');
+  }
 }
 
 function notifyVendeurPaiement(o){
@@ -757,6 +929,20 @@ function setRole(r){
 document.getElementById('btn-role-vendeur').onclick = function(){ setRole('vendeur'); };
 document.getElementById('btn-role-client').onclick = function(){ setRole('client'); };
 
+document.getElementById('btn-menu').onclick = function(){ toggleMenu(true); };
+document.getElementById('menu-overlay').onclick = function(){ toggleMenu(false); };
+document.getElementById('menu-profil').onclick = openProfilModal;
+document.getElementById('menu-parametres').onclick = openParametresModal;
+document.getElementById('menu-aide').onclick = openAideModal;
+document.getElementById('modal-overlay').onclick = closeModal;
+document.getElementById('modal-close').onclick = closeModal;
+
+// Le bandeau du haut se resserre et prend de l'ombre dès qu'on défile —
+// un repère visuel familier (comme WhatsApp, Instagram...).
+window.addEventListener('scroll', function(){
+  document.getElementById('topbar').classList.toggle('compact', window.scrollY > 8);
+}, { passive: true });
+
 function updateVault(){
   var ring = document.getElementById('ring');
   var label = document.getElementById('stage-label');
@@ -856,7 +1042,31 @@ function hideBalance(){
 }
 
 function screen(html){
-  document.getElementById('screen').innerHTML = html;
+  var el = document.getElementById('screen');
+  el.innerHTML = html;
+  el.classList.remove('screen');
+  void el.offsetWidth; // force le navigateur à "oublier" l'animation précédente
+  el.classList.add('screen');
+  animateCountUps(el);
+}
+
+// Fait défiler les montants en FCFA à l'affichage, au lieu de les figer.
+function animateCountUps(container){
+  container.querySelectorAll('[data-count]').forEach(function(node){
+    var target = parseInt(node.getAttribute('data-count'), 10);
+    if(isNaN(target)){ return; }
+    var duration = 650;
+    var start = null;
+    function step(ts){
+      if(!start) start = ts;
+      var progress = Math.min(1, (ts - start) / duration);
+      var eased = 1 - Math.pow(1 - progress, 3);
+      node.textContent = fcfa(Math.round(target * eased));
+      if(progress < 1) requestAnimationFrame(step);
+      else node.textContent = fcfa(target);
+    }
+    requestAnimationFrame(step);
+  });
 }
 
 function render(){
@@ -881,7 +1091,7 @@ function renderBalance(){
     '<h2>Fonds en séquestre</h2>' +
     '<div class="balance-card">' +
       '<div class="label">Montant bloqué pour cette commande</div>' +
-      '<div class="amount">' + fcfa(o.total) + '</div>' +
+      '<div class="amount"><span class="count-up" data-count="' + o.total + '">0 FCFA</span></div>' +
       '<div class="label">&#128274; Gelé — non retirable</div>' +
     '</div>' +
     '<p class="lead">' + roleText + '</p>' +
@@ -967,10 +1177,22 @@ function renderVendeur(){
         '<div><label for="f-frais">' + (t === 'meme_ville' ? 'Frais de livraison (FCFA)' : 'Frais d\'expédition (FCFA)') + '</label><input id="f-frais" type="number" min="0" placeholder="2000" value="' + (state.draft.frais || '') + '"></div>' +
       '</div>' +
       villeFields +
+      '<label style="margin-top:10px;">Photo du produit (optionnel)</label>' +
+      '<div id="product-photo-preview">' + (state.draft.photoProduit ? '<img src="' + state.draft.photoProduit + '" style="width:100%;border-radius:12px;margin:8px 0;" alt="Photo du produit"><button type="button" class="secondary" id="btn-remove-photo" style="margin-bottom:10px;">Retirer la photo</button>' : '') + '</div>' +
+      '<label for="f-photo" class="secondary" style="display:block;text-align:center;cursor:pointer;">&#128247; Prendre ou choisir une photo</label>' +
+      '<input type="file" id="f-photo" accept="image/*" style="display:none;">' +
+      '<p class="muted-small" style="margin-top:4px;">Elle reste sur ton téléphone — pense à l\'envoyer en pièce jointe dans le même message WhatsApp que le lien.</p>' +
       '<div class="err" id="f-err">Remplis tous les champs pour continuer (le prix et les frais doivent être remplis, même 0 pour les frais).</div>' +
       '<button class="primary" id="btn-create"' + (t === 'international' ? ' disabled style="opacity:0.5;"' : '') + '>Générer le lien de paiement</button>'
     );
     document.getElementById('btn-back-mode').onclick = function(){ state.vendorMode = null; render(); };
+    document.getElementById('f-photo').onchange = handleProductPhotoCapture;
+    if(state.draft.photoProduit){
+      document.getElementById('btn-remove-photo').onclick = function(){
+        state.draft.photoProduit = null;
+        document.getElementById('product-photo-preview').innerHTML = '';
+      };
+    }
     document.getElementById('type-meme-ville').onclick = function(){ selectType('meme_ville'); };
     document.getElementById('type-inter-ville').onclick = function(){ selectType('inter_ville'); };
     document.getElementById('type-international').onclick = function(){ selectType('international'); };
@@ -1079,7 +1301,7 @@ function renderVendeur(){
     var net = o.prix - o.commission;
     screen(
       illustration(SVG_HANDOFF) +
-      '<span class="badge ok">Paiement libéré</span>' +
+      '<span class="badge ok stamp-pop">Paiement libéré</span>' +
       '<h2>Tu as reçu ' + fcfa(net) + '</h2>' +
       '<p class="lead">La cliente a confirmé la conformité du colis. Voici le détail' + (o.operateur === 'orange' ? ' (via Orange Money)' : o.operateur === 'mtn' ? ' (via MTN MoMo)' : '') + ' :</p>' +
       '<div class="card">' +
@@ -1146,12 +1368,13 @@ function renderVendeur(){
 
 function orderCard(o){
   return '<div class="card">' +
+    (o.photoProduit ? '<img src="' + o.photoProduit + '" style="width:100%;border-radius:12px;margin-bottom:10px;" alt="Photo du produit">' : '') +
     '<div class="line"><span>Code commande</span><span class="code">' + o.id + '</span></div>' +
     '<div class="line"><span>Produit</span><span>' + o.produit + '</span></div>' +
     '<div class="line"><span>Trajet</span><span>' + o.depart + ' &rarr; ' + o.arrivee + '</span></div>' +
     '<div class="line"><span>Prix du produit</span><span>' + fcfa(o.prix) + '</span></div>' +
     '<div class="line"><span>Frais d\'expédition</span><span>' + fcfa(o.frais) + '</span></div>' +
-    '<div class="line"><span><b>Total à payer</b></span><span><b>' + fcfa(o.total) + '</b></span></div>' +
+    '<div class="line"><span><b>Total à payer</b></span><span><b><span class="count-up" data-count="' + o.total + '">0 FCFA</span></b></span></div>' +
   '</div>';
 }
 
@@ -1217,7 +1440,8 @@ function createOrder(){
     clientCode: null,
     agentConfirmed: false,
     clientConfirmed: false,
-    operateur: null
+    operateur: null,
+    photoProduit: state.draft.photoProduit || null
   };
   saveVendorProfile({ tel: state.order.vendeurTel, boutique: (getVendorProfile() || {}).boutique || '' });
   addToVendorHistory(state.order.id);
@@ -1901,6 +2125,44 @@ function handlePhotoCapture(e){
   reader.readAsDataURL(file);
 }
 
+// Réduit une photo avant de la garder en mémoire (les photos brutes d'un
+// téléphone récent font 2 à 5 Mo — bien trop pour tenir dans le stockage
+// local une fois qu'on en accumule plusieurs commandes).
+function compressImageFile(file, callback){
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    var img = new Image();
+    img.onload = function(){
+      var maxDim = 900;
+      var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      var canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      callback(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleProductPhotoCapture(e){
+  var file = e.target.files[0];
+  if(!file) return;
+  compressImageFile(file, function(dataUrl){
+    state.draft.photoProduit = dataUrl;
+    var preview = document.getElementById('product-photo-preview');
+    if(preview){
+      preview.innerHTML = '<img src="' + dataUrl + '" style="width:100%;border-radius:12px;margin:8px 0;" alt="Photo du produit">' +
+        '<button type="button" class="secondary" id="btn-remove-photo" style="margin-bottom:10px;">Retirer la photo</button>';
+      document.getElementById('btn-remove-photo').onclick = function(){
+        state.draft.photoProduit = null;
+        preview.innerHTML = '';
+      };
+    }
+  });
+}
+
 function checkClientCode(){
   var input = document.getElementById('f-code-client').value.trim();
   var err = document.getElementById('f-code-client-err');
@@ -1940,6 +2202,64 @@ function lockClientRole(){
 function lockVendorRole(){
   var btnC = document.getElementById('btn-role-client');
   if(btnC) btnC.style.display = 'none';
+}
+
+// ---- Menu "⋯" ----
+function toggleMenu(open){
+  document.getElementById('menu-overlay').classList.toggle('open', open);
+  document.getElementById('menu-sheet').classList.toggle('open', open);
+}
+
+// ---- Panneau modal générique (Profil / Paramètres / Aide) ----
+function openModal(title, bodyHtml){
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('modal-sheet').classList.add('open');
+}
+function closeModal(){
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.getElementById('modal-sheet').classList.remove('open');
+}
+
+function openProfilModal(){
+  toggleMenu(false);
+  var p = getVendorProfile() || {};
+  var historyCount = getVendorHistory().length;
+  openModal('Profil / mon compte',
+    '<p><b>Boutique :</b> ' + (p.boutique || '<span style="color:var(--muted);">Pas encore renseignée</span>') + '</p>' +
+    '<p><b>Numéro WhatsApp :</b> ' + (p.tel || '<span style="color:var(--muted);">Pas encore renseigné</span>') + '</p>' +
+    '<p><b>Commandes créées :</b> ' + historyCount + '</p>' +
+    '<p style="color:var(--muted);margin-top:14px;">Ces informations sont gardées sur ton téléphone et se remplissent automatiquement dès ta première commande ou ton premier catalogue.</p>'
+  );
+}
+
+function openParametresModal(){
+  toggleMenu(false);
+  openModal('Paramètres',
+    '<p><b>Connexion au paiement :</b> ' + (BACKEND_URL ? '<span style="color:var(--success);">Connectée à CamPay</span>' : '<span style="color:var(--muted);">Mode simulation (pas encore de serveur relié)</span>') + '</p>' +
+    '<p><b>Version de l\'appli :</b> ColisSûr pilote</p>' +
+    '<p style="color:var(--muted);margin-top:14px;">Pour effacer toutes les données gardées sur ce téléphone (commandes, catalogue, profil) :</p>' +
+    '<button class="secondary" id="btn-reset-data" style="margin-top:4px;color:var(--danger);border-color:var(--danger);">Effacer les données de cet appareil</button>'
+  );
+  var btn = document.getElementById('btn-reset-data');
+  if(btn){
+    btn.onclick = function(){
+      if(window.confirm('Ça efface toutes les commandes, le catalogue et le profil gardés sur ce téléphone, sans possibilité de revenir en arrière. Continuer ?')){
+        localStorage.clear();
+        window.location.reload();
+      }
+    };
+  }
+}
+
+function openAideModal(){
+  toggleMenu(false);
+  openModal('Aide et contact',
+    '<p><b>Comment ça marche ?</b> La cliente paie, l\'argent reste bloqué, la vendeuse envoie le colis, et l\'argent n\'est reversé qu\'une fois la cliente satisfaite.</p>' +
+    '<p><b>Un souci avec une commande ?</b> Le code de la commande (CS-XXXX) permet de la retrouver et de vérifier son statut à tout moment.</p>' +
+    '<p style="color:var(--muted);margin-top:14px;">ColisSûr est actuellement en phase pilote — n\'hésite pas à signaler tout problème rencontré.</p>'
+  );
 }
 
 var urlParams = new URLSearchParams(window.location.search);
