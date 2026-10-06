@@ -1538,12 +1538,26 @@ function resumeVendorOrder(id){
     render();
   } catch(e){}
 }
+function removeFromVendorHistory(id, deleteOrderToo){
+  try{
+    var ids = JSON.parse(localStorage.getItem('cs_vendor_order_ids') || '[]');
+    ids = ids.filter(function(x){ return x !== id; });
+    localStorage.setItem('cs_vendor_order_ids', JSON.stringify(ids));
+    if(deleteOrderToo){
+      localStorage.removeItem('cs_order_' + id);
+      var activeId = localStorage.getItem('cs_vendor_active_id');
+      if(activeId === id) localStorage.removeItem('cs_vendor_active_id');
+    }
+  } catch(e){}
+}
+
 function renderVendorHistory(){
   var orders = getVendorHistory();
   var list = orders.length ? orders.map(function(o){
-    return '<div class="card" style="cursor:pointer;" data-id="' + o.id + '">' +
-      '<div class="line"><span>' + o.produit + '</span><span class="code">' + o.id + '</span></div>' +
-      '<div class="line"><span>' + statutLabel(o.statut) + '</span><span>' + fcfa(o.total) + '</span></div>' +
+    return '<div class="card" data-id="' + o.id + '">' +
+      '<div class="line" style="cursor:pointer;" data-open="' + o.id + '"><span>' + o.produit + '</span><span class="code">' + o.id + '</span></div>' +
+      '<div class="line" style="cursor:pointer;" data-open="' + o.id + '"><span>' + statutLabel(o.statut) + '</span><span>' + fcfa(o.total) + '</span></div>' +
+      '<button class="secondary" style="margin-top:8px;padding:6px 10px;font-size:12px;color:var(--danger);border-color:var(--danger);" data-delete="' + o.id + '">Retirer de l\'historique</button>' +
     '</div>';
   }).join('') : '<div class="empty">Aucune commande créée pour le moment.</div>';
 
@@ -1554,8 +1568,18 @@ function renderVendorHistory(){
     list
   );
   document.getElementById('btn-back-mode').onclick = function(){ state.vendorMode = null; render(); };
-  document.querySelectorAll('#screen .card[data-id]').forEach(function(el){
-    el.onclick = function(){ resumeVendorOrder(el.getAttribute('data-id')); };
+  document.querySelectorAll('#screen [data-open]').forEach(function(el){
+    el.onclick = function(){ resumeVendorOrder(el.getAttribute('data-open')); };
+  });
+  document.querySelectorAll('#screen [data-delete]').forEach(function(btn){
+    btn.onclick = function(e){
+      e.stopPropagation();
+      var id = btn.getAttribute('data-delete');
+      if(window.confirm('Retirer la commande ' + id + ' de ton historique ? Ça ne rembourse ni n\'annule rien, ça efface juste la trace sur ton téléphone.')){
+        removeFromVendorHistory(id, true);
+        render();
+      }
+    };
   });
 }
 
