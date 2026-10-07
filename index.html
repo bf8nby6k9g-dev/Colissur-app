@@ -531,6 +531,32 @@
   /* ---- Chiffres qui comptent ---- */
   .count-up{display:inline-block;}
 
+  /* ---- Barre d'onglets du bas (façon WhatsApp) ---- */
+  #tab-bar{
+    position:fixed;
+    left:0;right:0;bottom:0;
+    background:#fff;
+    border-top:1px solid var(--border);
+    display:none;
+    z-index:50;
+    padding-bottom:var(--safe-bottom);
+  }
+  #tab-bar.visible{display:flex;}
+  #tab-bar button{
+    flex:1;
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    padding:9px 4px 8px;
+    border:none;background:none;
+    color:var(--muted);
+    font-family:'Inter',sans-serif;
+    font-size:10.5px;
+    font-weight:500;
+  }
+  #tab-bar button.active{color:var(--accent);}
+  #tab-bar button.active .ico{color:var(--accent);}
+  #tab-bar button:active{opacity:0.6;}
+  body.has-tabbar .phone{padding-bottom:calc(58px + var(--safe-bottom));}
+
   /* ---- Icônes traits fins (remplacent les émojis dans l'UI principale) ---- */
   .ico{display:inline-block;vertical-align:-4px;flex-shrink:0;}
   .ico svg{display:block;width:100%;height:100%;}
@@ -578,6 +604,13 @@
     <div class="modal-handle"></div>
     <h3 id="modal-title"></h3>
     <div class="modal-body" id="modal-body"></div>
+  </div>
+
+  <div id="tab-bar">
+    <button id="tab-vendre" data-mode="ecommerce"></button>
+    <button id="tab-catalogue" data-mode="marketplace"></button>
+    <button id="tab-historique" data-mode="history"></button>
+    <button id="tab-profil"></button>
   </div>
 
   <div class="vault">
@@ -979,6 +1012,15 @@ function setRole(r){
 document.getElementById('btn-role-vendeur').onclick = function(){ setRole('vendeur'); };
 document.getElementById('btn-role-client').onclick = function(){ setRole('client'); };
 
+document.getElementById('tab-vendre').innerHTML = ico('chat', 21) + '<span>Vendre</span>';
+document.getElementById('tab-catalogue').innerHTML = ico('bag', 21) + '<span>Catalogue</span>';
+document.getElementById('tab-historique').innerHTML = ico('clipboard', 21) + '<span>Historique</span>';
+document.getElementById('tab-profil').innerHTML = ico('user', 21) + '<span>Profil</span>';
+document.querySelectorAll('#tab-bar button[data-mode]').forEach(function(btn){
+  btn.onclick = function(){ state.vendorMode = btn.getAttribute('data-mode'); render(); };
+});
+document.getElementById('tab-profil').onclick = openProfilModal;
+
 document.getElementById('btn-menu').onclick = function(){ toggleMenu(true); };
 document.getElementById('menu-overlay').onclick = function(){ toggleMenu(false); };
 document.getElementById('menu-profil').onclick = openProfilModal;
@@ -1152,6 +1194,21 @@ function render(){
   }
   if(state.role === 'vendeur') renderVendeur();
   else renderClient();
+  updateTabBar();
+}
+
+// La barre du bas ne sert que tant qu'aucune commande n'est en cours
+// chez la vendeuse — une fois une commande ouverte, on la masque pour
+// ne pas gêner le suivi de cette commande précise.
+function updateTabBar(){
+  var show = state.role === 'vendeur' && !state.order;
+  document.getElementById('tab-bar').classList.toggle('visible', show);
+  document.body.classList.toggle('has-tabbar', show);
+  if(!show) return;
+  var current = state.vendorMode || '';
+  document.querySelectorAll('#tab-bar button[data-mode]').forEach(function(btn){
+    btn.classList.toggle('active', btn.getAttribute('data-mode') === current);
+  });
 }
 
 function renderBalance(){
