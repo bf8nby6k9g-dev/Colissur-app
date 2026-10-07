@@ -993,6 +993,29 @@ window.addEventListener('scroll', function(){
   document.getElementById('topbar').classList.toggle('compact', window.scrollY > 8);
 }, { passive: true });
 
+// Glisser à gauche/droite pour parcourir Transaction directe / Catalogue /
+// Historique, comme un carrousel — uniquement tant qu'aucune commande
+// n'est en cours, pour ne jamais gêner la saisie d'un formulaire actif.
+(function(){
+  var startX = 0, startY = 0, tracking = false;
+  var screenEl = document.getElementById('screen');
+  screenEl.addEventListener('touchstart', function(e){
+    if(state.order || state.role !== 'vendeur') { tracking = false; return; }
+    tracking = true;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  screenEl.addEventListener('touchend', function(e){
+    if(!tracking) return;
+    tracking = false;
+    var dx = e.changedTouches[0].clientX - startX;
+    var dy = e.changedTouches[0].clientY - startY;
+    if(Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.6){
+      swipeVendorScreen(dx < 0 ? 1 : -1);
+    }
+  }, { passive: true });
+})();
+
 function updateVault(){
   var ring = document.getElementById('ring');
   var label = document.getElementById('stage-label');
@@ -1159,6 +1182,28 @@ function renderBalance(){
   document.getElementById('btn-back-balance').onclick = hideBalance;
 }
 
+// Les 4 "pages" que l'on peut parcourir au doigt, dans l'ordre, quand
+// aucune commande n'est en cours : le choix, puis les 3 destinations.
+var VENDOR_SWIPE_PAGES = [null, 'ecommerce', 'marketplace', 'history'];
+function vendorSwipeIndex(){
+  var i = VENDOR_SWIPE_PAGES.indexOf(state.vendorMode || null);
+  return i === -1 ? 0 : i;
+}
+function swipeVendorScreen(dir){
+  if(state.order || state.role !== 'vendeur') return;
+  var next = vendorSwipeIndex() + dir;
+  if(next < 0 || next >= VENDOR_SWIPE_PAGES.length) return;
+  state.vendorMode = VENDOR_SWIPE_PAGES[next];
+  render();
+}
+function swipeDots(){
+  var i = vendorSwipeIndex();
+  var dots = VENDOR_SWIPE_PAGES.map(function(_, idx){
+    return '<span style="width:' + (idx === i ? '18px' : '6px') + ';height:6px;border-radius:3px;background:' + (idx === i ? 'var(--accent)' : 'var(--border)') + ';display:inline-block;transition:width .25s var(--ease), background .25s var(--ease);"></span>';
+  }).join('');
+  return '<div style="display:flex;gap:5px;justify-content:center;margin:4px 0 14px;">' + dots + '</div>';
+}
+
 function renderVendeur(){
   var o = state.order;
 
@@ -1173,7 +1218,9 @@ function renderVendeur(){
         '<p class="lead">' + (profile && profile.boutique ? 'Bonjour ' + profile.boutique + ' !' : 'Choisis comment tu veux vendre aujourd\'hui.') + '</p>' +
         '<button class="primary" id="mode-ecommerce" style="text-align:left;line-height:1.4;display:flex;gap:10px;align-items:flex-start;">' + ico('chat', 20) + '<span>Transaction directe<br><span style="font-weight:400;font-size:12px;opacity:0.9;">Créer une commande pour une cliente précise</span></span></button>' +
         '<button class="primary" id="mode-marketplace" style="text-align:left;line-height:1.4;margin-top:10px;background:#B25F04;display:flex;gap:10px;align-items:flex-start;">' + ico('bag', 20) + '<span>Mon catalogue (Marketplace)<br><span style="font-weight:400;font-size:12px;opacity:0.9;">Publier tes produits, que les clientes découvrent</span></span></button>' +
-        '<button class="secondary" id="mode-history" style="margin-top:10px;display:flex;gap:10px;align-items:center;justify-content:center;">' + ico('clipboard', 18) + '<span>Historique de mes commandes</span></button>'
+        '<button class="secondary" id="mode-history" style="margin-top:10px;display:flex;gap:10px;align-items:center;justify-content:center;">' + ico('clipboard', 18) + '<span>Historique de mes commandes</span></button>' +
+        '<p class="muted-small" style="text-align:center;margin-top:16px;">&#8592; Glisse pour parcourir &#8594;</p>' +
+        swipeDots()
       );
       document.getElementById('mode-ecommerce').onclick = function(){ state.vendorMode = 'ecommerce'; render(); };
       document.getElementById('mode-marketplace').onclick = function(){ state.vendorMode = 'marketplace'; render(); };
@@ -1207,6 +1254,7 @@ function renderVendeur(){
     }
     screen(
       '<button class="secondary" id="btn-back-mode" style="margin-bottom:10px;">&larr; Retour</button>' +
+      swipeDots() +
       illustration(SVG_BOX) +
       '<h2>Nouvelle commande</h2>' +
       '<p class="lead">Décris le colis à envoyer. Un lien de paiement sécurisé sera généré pour ta cliente.</p>' +
@@ -1563,6 +1611,7 @@ function renderVendorHistory(){
 
   screen(
     '<button class="secondary" id="btn-back-mode" style="margin-bottom:10px;">&larr; Retour</button>' +
+    swipeDots() +
     '<h2>Historique de mes commandes</h2>' +
     '<p class="lead">Toutes les commandes que tu as créées, tous types confondus.</p>' +
     list
@@ -1681,6 +1730,7 @@ function renderCatalogManager(){
     var t = state.catalogDraft.type || 'inter_ville';
     screen(
       '<button class="secondary" id="btn-back-mode" style="margin-bottom:10px;">&larr; Retour</button>' +
+      swipeDots() +
       illustration(SVG_BOX, true) +
       '<h2>Crée ton catalogue</h2>' +
       '<p class="lead">Une fois créé, tu pourras ajouter tes produits et partager le lien dans les groupes Facebook ou sur WhatsApp.</p>' +
@@ -1716,6 +1766,7 @@ function renderCatalogManager(){
 
   screen(
     '<button class="secondary" id="btn-back-mode" style="margin-bottom:10px;">&larr; Retour</button>' +
+    swipeDots() +
     '<h2>' + cat.boutique + '</h2>' +
     '<p class="lead">' + cat.items.length + ' produit(s) au catalogue — ' + (cat.typeTransaction === 'meme_ville' ? cat.depart : 'depuis ' + cat.depart) + '</p>' +
     itemsHtml +
