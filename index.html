@@ -1726,9 +1726,23 @@ function saveCatalog(cat){
   try{ localStorage.setItem('cs_catalog', JSON.stringify(cat)); }
   catch(e){}
 }
+// Stats réelles de la vendeuse, à partir de son propre historique —
+// pas de triche possible : seules les commandes réellement "libérées"
+// (confirmées par une cliente) comptent.
+var BADGE_VERIFIE_SEUIL = 3;
+function getVendorStats(){
+  var orders = getVendorHistory();
+  var ventesReussies = orders.filter(function(o){ return o.statut === 'libere'; }).length;
+  var notes = orders.filter(function(o){ return o.avisNote; }).map(function(o){ return o.avisNote; });
+  var avgNote = notes.length ? (notes.reduce(function(a,b){ return a+b; }, 0) / notes.length) : 0;
+  return { ventesReussies: ventesReussies, avgNote: avgNote, nbAvis: notes.length, verifiee: ventesReussies >= BADGE_VERIFIE_SEUIL };
+}
+
 function encodeCatalog(cat){
+  var stats = getVendorStats();
   var payload = {
     vt: cat.vendeurTel, d: cat.depart, t: cat.typeTransaction, b: cat.boutique,
+    vn: stats.ventesReussies, an: Math.round(stats.avgNote * 10), ac: stats.nbAvis,
     items: cat.items.map(function(it){ return { i: it.id, n: it.nom, p: it.prix, f: it.frais }; })
   };
   return encodeURIComponent(toBase64Unicode(JSON.stringify(payload)));
@@ -1739,11 +1753,26 @@ function decodeCatalog(str){
     return {
       vendeurTel: payload.vt || '', depart: payload.d || '', typeTransaction: payload.t || 'inter_ville',
       boutique: payload.b || 'Boutique ColisSûr',
+      ventesReussies: payload.vn || 0, avgNote: (payload.an || 0) / 10, nbAvis: payload.ac || 0,
       items: (payload.items || []).map(function(it){
         return { id: it.i, nom: it.n, prix: it.p, frais: it.f };
       })
     };
   } catch(e){ return null; }
+}
+function trustBadgeHtml(ventesReussies, avgNote, nbAvis){
+  var parts = [];
+  if(ventesReussies >= BADGE_VERIFIE_SEUIL){
+    parts.push('<span style="display:inline-flex;align-items:center;gap:4px;background:var(--success-light);color:var(--success);padding:4px 10px;border-radius:20px;font-size:11.5px;font-weight:600;">' +
+      '<span class="ico" style="width:13px;height:13px;"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg></span>Vendeuse vérifiée</span>');
+  }
+  if(ventesReussies > 0){
+    parts.push('<span class="muted-small">' + ventesReussies + ' vente(s) réussie(s)</span>');
+  }
+  if(nbAvis > 0){
+    parts.push('<span class="muted-small">' + avgNote.toFixed(1) + ' &#9733; (' + nbAvis + ' avis)</span>');
+  }
+  return parts.length ? '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 2px;">' + parts.join('') + '</div>' : '';
 }
 function buildCatalogLink(cat){
   var base = window.location.href.split('?')[0].split('#')[0];
@@ -1856,6 +1885,7 @@ function renderCatalogManager(q){
     swipeDots() +
     '<h2>' + cat.boutique + '</h2>' +
     '<p class="lead">' + cat.items.length + ' produit(s) au catalogue — ' + (cat.typeTransaction === 'meme_ville' ? cat.depart : 'depuis ' + cat.depart) + '</p>' +
+    (function(){ var s = getVendorStats(); return trustBadgeHtml(s.ventesReussies, s.avgNote, s.nbAvis); })() +
     (cat.items.length > 4 ? '<div class="search-wrap">' + ico('search', 16) + '<input id="f-search-cat" placeholder="Rechercher un produit..." value="' + q + '"></div>' : '') +
     itemsHtml +
     '<label for="f-item-nom" style="margin-top:10px;">Ajouter un produit</label>' +
@@ -2031,6 +2061,7 @@ function renderCatalogBrowse(){
   screen(
     illustration(SVG_BOX, true) +
     '<h2>' + cat.boutique + '</h2>' +
+    trustBadgeHtml(cat.ventesReussies || 0, cat.avgNote || 0, cat.nbAvis || 0) +
     '<p class="lead">' + (cat.typeTransaction === 'meme_ville' ? 'Vente et livraison à ' + cat.depart : 'Expédié depuis ' + cat.depart) + '. Paiement sécurisé, argent bloqué jusqu\'à ta confirmation de réception.</p>' +
     itemsHtml
   );
@@ -2446,10 +2477,17 @@ function openProfilModal(){
   toggleMenu(false);
   var p = getVendorProfile() || {};
   var historyCount = getVendorHistory().length;
+  var s = getVendorStats();
+  var badgeProgress = s.verifiee
+    ? '<p style="color:var(--success);margin-top:10px;">&#10003; Félicitations, tu as le badge "Vendeuse vérifiée" !</p>'
+    : '<p class="muted-small" style="margin-top:10px;">Encore ' + (BADGE_VERIFIE_SEUIL - s.ventesReussies) + ' vente(s) réussie(s) avant d\'obtenir le badge "Vendeuse vérifiée", visible par tes clientes sur ton catalogue.</p>';
   openModal('Profil / mon compte',
     '<p><b>Boutique :</b> ' + (p.boutique || '<span style="color:var(--muted);">Pas encore renseignée</span>') + '</p>' +
     '<p><b>Numéro WhatsApp :</b> ' + (p.tel || '<span style="color:var(--muted);">Pas encore renseigné</span>') + '</p>' +
     '<p><b>Commandes créées :</b> ' + historyCount + '</p>' +
+    '<p><b>Ventes réussies :</b> ' + s.ventesReussies + '</p>' +
+    (s.nbAvis ? '<p><b>Note moyenne :</b> ' + s.avgNote.toFixed(1) + ' &#9733; (' + s.nbAvis + ' avis)</p>' : '') +
+    badgeProgress +
     '<p style="color:var(--muted);margin-top:14px;">Ces informations sont gardées sur ton téléphone et se remplissent automatiquement dès ta première commande ou ton premier catalogue.</p>'
   );
 }
