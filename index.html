@@ -1011,6 +1011,24 @@ var ICONS = {
   search: '<circle cx="8.8" cy="8.8" r="5.3"/><path d="M16.5 16.5l-3.8-3.8"/>',
   star: '<path d="M10 2.8l2.1 4.4 4.8.6-3.5 3.4.9 4.8L10 13.6l-4.3 2.4.9-4.8-3.5-3.4 4.8-.6Z"/>'
 };
+// Images par défaut pour un produit du catalogue, quand la vendeuse n'a
+// pas de vraie photo sous la main. Ce sont des dessins simples (pas des
+// photos) : ils restent légers et peuvent donc voyager dans le lien
+// partagé, contrairement à une vraie photo — la cliente les voit aussi.
+var PRODUCT_DEFAULTS = {
+  sac: { label: 'Sac', couleur: '#C17D1F', forme: '<path d="M25 40 Q25 25 42 25 L58 25 Q75 25 75 40 L78 78 Q78 86 70 86 L30 86 Q22 86 22 78 Z"/><path d="M36 25 Q36 12 50 12 Q64 12 64 25" fill="none" stroke="#092A27" stroke-width="4"/>' },
+  chaussures: { label: 'Chaussures', couleur: '#17524C', forme: '<path d="M14 62 Q14 52 26 50 L48 46 Q56 44 62 50 L80 58 Q88 61 88 70 L88 76 L14 76 Z"/><path d="M26 50 L26 62 M48 46 L50 60" stroke="#092A27" stroke-width="2.5" fill="none"/>' },
+  vetement: { label: 'Vêtement', couleur: '#A5680F', forme: '<path d="M36 18 L50 28 L64 18 L80 28 L72 42 L64 36 L64 86 L36 86 L36 36 L28 42 L20 28 Z"/>' },
+  telephone: { label: 'Téléphone', couleur: '#092A27', forme: '<rect x="32" y="12" width="36" height="76" rx="8"/><rect x="38" y="20" width="24" height="52" rx="2" fill="#EEF1EB"/><circle cx="50" cy="80" r="3" fill="#EEF1EB"/>' },
+  nourriture: { label: 'Alimentaire', couleur: '#B23A2E', forme: '<circle cx="50" cy="52" r="34"/><path d="M50 18 Q56 28 50 36 Q44 28 50 18 Z" fill="#2F7D4F"/>' },
+  bijou: { label: 'Bijou / accessoire', couleur: '#C17D1F', forme: '<path d="M50 14 L68 40 L50 88 L32 40 Z"/><path d="M32 40 L68 40 M41 40 L50 14 L59 40" fill="none" stroke="#FBEEDB" stroke-width="2"/>' }
+};
+function productDefaultSvg(key, size){
+  var d = PRODUCT_DEFAULTS[key];
+  if(!d) return '';
+  return '<svg viewBox="0 0 100 100" width="' + size + '" height="' + size + '" style="display:block;margin:0 auto;"><rect width="100" height="100" rx="18" fill="' + d.couleur + '" opacity="0.14"/><g fill="' + d.couleur + '">' + d.forme + '</g></svg>';
+}
+
 function ico(name, size){
   size = size || 18;
   return '<span class="ico" style="width:' + size + 'px;height:' + size + 'px;">' +
@@ -1743,7 +1761,7 @@ function encodeCatalog(cat){
   var payload = {
     vt: cat.vendeurTel, d: cat.depart, t: cat.typeTransaction, b: cat.boutique,
     vn: stats.ventesReussies, an: Math.round(stats.avgNote * 10), ac: stats.nbAvis,
-    items: cat.items.map(function(it){ return { i: it.id, n: it.nom, p: it.prix, f: it.frais }; })
+    items: cat.items.map(function(it){ return { i: it.id, n: it.nom, p: it.prix, f: it.frais, ic: it.icone || undefined }; })
   };
   return encodeURIComponent(toBase64Unicode(JSON.stringify(payload)));
 }
@@ -1755,7 +1773,7 @@ function decodeCatalog(str){
       boutique: payload.b || 'Boutique ColisSûr',
       ventesReussies: payload.vn || 0, avgNote: (payload.an || 0) / 10, nbAvis: payload.ac || 0,
       items: (payload.items || []).map(function(it){
-        return { id: it.i, nom: it.n, prix: it.p, frais: it.f };
+        return { id: it.i, nom: it.n, prix: it.p, frais: it.f, icone: it.ic || null };
       })
     };
   } catch(e){ return null; }
@@ -1799,9 +1817,29 @@ function addCatalogItem(){
   }
   err.style.display = 'none';
   var cat = getCatalog();
-  cat.items.push({ id: genCode(), nom: nom, prix: prix, frais: frais });
+  cat.items.push({
+    id: genCode(), nom: nom, prix: prix, frais: frais,
+    icone: state.itemDraftIcone || null,
+    photo: state.itemDraftPhoto || null
+  });
   saveCatalog(cat);
+  state.itemDraftIcone = null;
+  state.itemDraftPhoto = null;
   render();
+}
+function selectItemIcone(key){
+  state.itemDraftIcone = key;
+  state.itemDraftPhoto = null;
+  render();
+}
+function handleItemPhotoCapture(e){
+  var file = e.target.files[0];
+  if(!file) return;
+  compressImageFile(file, function(dataUrl){
+    state.itemDraftPhoto = dataUrl;
+    state.itemDraftIcone = null;
+    render();
+  });
 }
 function removeCatalogItem(id){
   var cat = getCatalog();
@@ -1846,9 +1884,15 @@ function renderCatalogManager(q){
     screen(
       '<button class="secondary" id="btn-back-mode" style="margin-bottom:10px;">&larr; Retour</button>' +
       swipeDots() +
-      illustration(SVG_BOX, true) +
+      '<h2>Bienvenue sur le Marketplace</h2>' +
+      '<p class="lead">Voici le genre de produits que tu pourras vendre — sacs, chaussures, vêtements et bien plus.</p>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0 18px;">' +
+        Object.keys(PRODUCT_DEFAULTS).map(function(key){
+          return '<div style="text-align:center;">' + productDefaultSvg(key, 64) + '<div class="muted-small" style="margin-top:4px;">' + PRODUCT_DEFAULTS[key].label + '</div></div>';
+        }).join('') +
+      '</div>' +
       '<h2>Crée ton catalogue</h2>' +
-      '<p class="lead">Une fois créé, tu pourras ajouter tes produits et partager le lien dans les groupes Facebook ou sur WhatsApp.</p>' +
+      '<p class="lead">Une fois créé, tu pourras ajouter tes produits (avec tes vraies photos ou ces dessins) et partager le lien dans les groupes Facebook ou sur WhatsApp.</p>' +
       '<label for="f-cat-boutique">Nom de ta boutique</label>' +
       '<input id="f-cat-boutique" placeholder="Ex. Chez Aïcha Mode" value="' + (profile.boutique || '') + '">' +
       '<label for="f-cat-tel">Ton numéro WhatsApp</label>' +
@@ -1873,12 +1917,22 @@ function renderCatalogManager(q){
 
   var visibleItems = q ? cat.items.filter(function(it){ return it.nom.toLowerCase().indexOf(q) !== -1; }) : cat.items;
   var itemsHtml = visibleItems.length ? visibleItems.map(function(it){
+    var vignette = it.icone ? productDefaultSvg(it.icone, 44)
+      : (it.photo ? '<img src="' + it.photo + '" style="width:44px;height:44px;border-radius:10px;object-fit:cover;">' : '');
     return '<div class="card">' +
-      '<div class="line"><span>' + it.nom + '</span><span>' + fcfa(it.prix + it.frais) + '</span></div>' +
+      '<div class="line" style="align-items:center;">' +
+        '<span style="display:flex;align-items:center;gap:10px;">' + vignette + '<span>' + it.nom + '</span></span>' +
+        '<span>' + fcfa(it.prix + it.frais) + '</span>' +
+      '</div>' +
       '<div class="line"><span class="muted-small">Produit ' + fcfa(it.prix) + ' + frais ' + fcfa(it.frais) + '</span>' +
       '<span><button class="secondary" style="padding:4px 10px;font-size:11px;" data-remove="' + it.id + '">Supprimer</button></span></div>' +
     '</div>';
   }).join('') : (q ? '<p class="muted-small">Aucun produit ne correspond à "' + q + '".</p>' : '<p class="muted-small">Aucun produit ajouté pour l\'instant.</p>');
+
+  var iconePicker = Object.keys(PRODUCT_DEFAULTS).map(function(key){
+    var selected = state.itemDraftIcone === key;
+    return '<button type="button" data-icone="' + key + '" style="background:none;border:2px solid ' + (selected ? 'var(--accent)' : 'transparent') + ';border-radius:12px;padding:2px;">' + productDefaultSvg(key, 40) + '</button>';
+  }).join('');
 
   screen(
     '<button class="secondary" id="btn-back-mode" style="margin-bottom:10px;">&larr; Retour</button>' +
@@ -1894,11 +1948,23 @@ function renderCatalogManager(q){
       '<div><label for="f-item-prix">Prix (FCFA)</label><input id="f-item-prix" type="number" min="1" placeholder="20000"></div>' +
       '<div><label for="f-item-frais">Frais (FCFA)</label><input id="f-item-frais" type="number" min="0" placeholder="1000"></div>' +
     '</div>' +
+    '<label style="margin-top:10px;">Image du produit</label>' +
+    '<p class="muted-small" style="margin-top:-4px;">Un dessin simple s\'affiche chez la cliente directement. Une vraie photo reste sur ton téléphone (à envoyer à part sur WhatsApp).</p>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px;">' + iconePicker + '</div>' +
+    (state.itemDraftPhoto
+      ? '<div style="margin-bottom:8px;"><img src="' + state.itemDraftPhoto + '" style="width:60px;height:60px;border-radius:10px;object-fit:cover;"> <span class="muted-small">Vraie photo choisie</span></div>'
+      : '') +
+    '<label for="f-item-photo" class="secondary" style="display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;margin-bottom:10px;">' + ico('camera', 16) + '<span>Ou prendre une vraie photo</span></label>' +
+    '<input type="file" id="f-item-photo" accept="image/*" style="display:none;">' +
     '<div class="err" id="f-item-err">Remplis le nom, le prix et les frais.</div>' +
     '<button class="secondary" id="btn-add-item">+ Ajouter au catalogue</button>' +
     (cat.items.length ? '<button class="primary" id="btn-share-catalog" style="background:#25D366;margin-top:14px;">&#128241; Partager mon catalogue sur WhatsApp</button>' : '') +
     '<p class="muted-small" style="margin-top:8px;">Poste aussi ce lien directement dans les groupes Facebook d\'achat-vente.</p>'
   );
+  document.querySelectorAll('#screen [data-icone]').forEach(function(btn){
+    btn.onclick = function(){ selectItemIcone(btn.getAttribute('data-icone')); };
+  });
+  document.getElementById('f-item-photo').onchange = handleItemPhotoCapture;
   document.getElementById('btn-back-mode').onclick = function(){ state.vendorMode = null; render(); };
   document.getElementById('btn-add-item').onclick = addCatalogItem;
   if(cat.items.length){
@@ -2052,7 +2118,8 @@ function renderCatalogBrowse(){
   var cat = state.catalogBrowse;
   var itemsHtml = cat.items.length ? cat.items.map(function(it){
     return '<div class="card">' +
-      '<div class="line"><span><b>' + it.nom + '</b></span><span>' + fcfa(it.prix + it.frais) + '</span></div>' +
+      (it.icone ? productDefaultSvg(it.icone, 72) : '') +
+      '<div class="line" style="margin-top:' + (it.icone ? '8px' : '0') + ';"><span><b>' + it.nom + '</b></span><span>' + fcfa(it.prix + it.frais) + '</span></div>' +
       '<div class="line"><span class="muted-small">Produit ' + fcfa(it.prix) + ' + frais ' + fcfa(it.frais) + '</span></div>' +
       '<button class="primary" style="margin-top:8px;" data-buy="' + it.id + '">Acheter en sécurité</button>' +
     '</div>';
