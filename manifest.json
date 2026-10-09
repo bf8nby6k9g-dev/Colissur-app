@@ -2,7 +2,7 @@
   "name": "ColisSûr",
   "short_name": "ColisSûr",
   "description": "Le tiers de confiance pour le commerce interurbain au Cameroun",
-  "start_url": index.html
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#EEF1EB",
   "theme_color": "#0E3D39",
